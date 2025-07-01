@@ -216,6 +216,23 @@ public class UserService
         // makes sure that any required values are not set to null. Throws "NullReqFieldException" if so.
         CheckRequiredPropsNotNull_NEW(u);
 
+        // TODO: For each prop, like we are doing with the reflection method, check for all of the constraints, not just the
+        // required constraint.
+        // Use the User model class via the Context.
+        // Create some sort of JSON to display all the errors per field, like:
+        /*
+        [
+            {
+                "Token": "FirstName",
+                "Errors": [
+                    "Required field cannot be set to null",
+                    "Must be no longer than 20 characters long"
+                ]
+            },
+            {...}
+        ]
+        */
+
         List<string> errors = new List<string>();
         string errorMessage = "";
 
