@@ -39,17 +39,17 @@ public class UserService
     {
         // If an Optional is NULL               SET TO NULL
         // If an Optional's value is NULL       SET TO NULL
-        User createdUser = await _userRepository.AddUser(SanitizeUser(new User
-        {
+        User createdUser = new User{
             FirstName = newUserDTO.FirstName,
             LastName = newUserDTO.LastName,
             Email = newUserDTO.Email,
             PhoneNumber = newUserDTO.PhoneNumber != null ? newUserDTO.PhoneNumber.value : null,
             Dob = newUserDTO.Dob != null ? newUserDTO.Dob.value : null
-        }));
+        }
 
-        // here we convert
-        return GetResponseUserDTO(createdUser)!;
+        SanitizeUser(createdUser);
+
+        return GetResponseUserDTO(_userRepository.CreateUser(createdUser));
     }
 
     public async Task<ResponseUserDTO?> FullyUpdateUserById(UpdateUserDTO userDTO, int id)
@@ -58,27 +58,21 @@ public class UserService
 
         if (originalUser == null) return null;
 
-        // Makes sure the userDTO's REQUIRED properties are not set to null
-        // Throws NullReqFieldException exception if so.
-        CheckRequiredPropsNotNull(userDTO, true);
-
         // If an Optional is NULL               SET TO NULL
         // If an Optional's value is NULL       SET TO NULL
-        // Optional's value for a NON NULL column will throw an Exception
-        User updatedUser = new User
+        User fullyUpdatedUser = new User
         {
             FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : null!,
             LastName = userDTO.LastName != null ? userDTO.LastName.value! : null!,
             Email = userDTO.Email != null ? userDTO.Email.value! : null!,
-            PhoneNumber = userDTO.PhoneNumber != null ? userDTO.PhoneNumber.value : null,
-            Dob = userDTO.Dob != null ? userDTO.Dob.value : null
+            PhoneNumber = userDTO.PhoneNumber != null ? userDTO.PhoneNumber.value : null!,
+            Dob = userDTO.Dob != null ? userDTO.Dob.value : null!
         };
 
-        // checks for invalid values assigned to the properties
-        // throws SanitationException
-        SanitizeUser(updatedUser);
+        // checks for invalid values assigned to the user's properties
+        SanitizeUser(fullyUpdatedUser);
 
-        return GetResponseUserDTO(await _userRepository.UpdateUserById(updatedUser, id));
+        return GetResponseUserDTO(await _userRepository.UpdateUserById(fullyUpdatedUser, id));
     }
 
     public async Task<ResponseUserDTO?> PartiallyUpdateUserById(UpdateUserDTO userDTO, int id)
@@ -87,13 +81,8 @@ public class UserService
 
         if (targetUser == null) return null;
 
-        // Makes sure the userDTO's REQUIRED properties are not set to null
-        // Throws NullReqFieldException exception if so.
-        CheckRequiredPropsNotNull(userDTO, false);
-
         // If an Optional is NULL               SKIP IT
         // If an Optional's value is NULL       SET TO NULL
-        // Optional's value for a 'NOT NULL' column will throw an Exception
         User partiallyUPdatedUser = new User {
             FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : targetUser.FirstName,
             LastName = userDTO.LastName != null ? userDTO.LastName.value! : targetUser.LastName,
@@ -102,8 +91,7 @@ public class UserService
             Dob = userDTO.Dob != null ? userDTO.Dob.value : targetUser.Dob
         };
 
-        // checks for invalid values assigned to the properties
-        // throws SanitationException
+        // checks for invalid values assigned to the user's properties
         SanitizeUser(partiallyUPdatedUser);
 
         return GetResponseUserDTO(await _userRepository.UpdateUserById(partiallyUPdatedUser, id));
@@ -112,6 +100,42 @@ public class UserService
     public async Task<bool> DeleteUserById(int id)
     {
         return await _userRepository.DeleteUserById(id);
+    }
+
+    private void CheckRequiredPropsNotNull_NEW(User user)
+    {
+        string message = "You cannot set the following properties to NULL:";
+        List<string> props = new List<string>();
+
+        List<string> requiredPropsNames = typeof(CreateUserDTO)
+        .GetProperties()
+        .Where(p => Attribute.IsDefined(p, typeof(RequiredAttribute)))
+        .Select(p => p.Name)
+        .ToList();
+
+        PropertyInfo[] col_cls_UpdateUserDTO_properties = typeof(User).GetProperties();
+
+        foreach (PropertyInfo cls_UpdateUserDTO_curProp in col_cls_UpdateUserDTO_properties)
+        {
+            if (requiredPropsNames.Contains(cls_UpdateUserDTO_curProp.Name))
+            {
+                object? mem_user_curProp = cls_UpdateUserDTO_curProp.GetValue(user);
+
+                // if the field in mem is null
+                if (mem_user_curProp == null)
+                    props.Add(cls_UpdateUserDTO_curProp.Name);
+            }
+        }
+
+        if (props.Count == 0) return;
+
+        for (int i = 0; i < props.Count - 1; i++)
+        {
+            message += $" {props[i]},";
+        }
+        message += $" {props.Last()}.";
+
+        if (props.Count > 0) throw new NullReqFieldException(message);
     }
 
     // Required fields list is taken from the CreateUserDTO class via reflection.
@@ -189,6 +213,9 @@ public class UserService
     // the constraints and check on those here.
     private void SanitizeUser(User u)
     {
+        // makes sure that any required values are not set to null. Throws "NullReqFieldException" if so.
+        CheckRequiredPropsNotNull_NEW(u);
+
         List<string> errors = new List<string>();
         string errorMessage = "";
 
