@@ -21,7 +21,7 @@ public class ErrorController : ControllerBase
         }
         if (ex is Exception)
         {
-            return StatusCode(500, "Something went wrong.");
+            return StatusCode(500, ex.Message);
         }
 
         return Problem();
