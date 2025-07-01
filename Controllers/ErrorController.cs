@@ -9,10 +9,6 @@ using Microsoft.Data.SqlClient;
 public class ErrorController : ControllerBase
 {
 
-    public ErrorController(UsersRepository repo)
-    {
-    }
-
     [Route("/error")]
     public IActionResult HandleError()
     {
