@@ -8,14 +8,12 @@ public class UserService
 {
     private readonly UsersRepository _userRepository;
     private readonly ILogger<UserService> _logger;
-    private readonly IEntityType _userEntType;
 
 
     public UserService(UsersRepository userRepository, ILogger<UserService> logger, DbnameContext context)
     {
         _userRepository = userRepository;
         _logger = logger;
-        _userEntType = context.Model.FindEntityType(typeof(User))!;
     }
 
     public async Task<List<ResponseUserDTO>> GetAllUsers()
@@ -114,34 +112,6 @@ public class UserService
     public async Task<bool> DeleteUserById(int id)
     {
         return await _userRepository.DeleteUserById(id);
-    }
-
-    private void Old(UpdateUserDTO user)
-    {
-        string message = "You cannot set the following properties to NULL: ";
-        List<string> props = new List<string>();
-
-        if (user.FirstName != null && user.FirstName.value == null)
-        {
-            props.Add("FirstName");
-        }
-        if (user.LastName != null && user.LastName.value == null)
-        {
-            props.Add("LastName");
-        }
-        if (user.Email != null && user.Email.value == null)
-        {
-            props.Add("Email");
-        }
-
-        for (int i = 0; i < props.Count - 1; i++)
-        {
-            message += $"{props[i]}, ";
-        }
-        message += $"{props.Last()}.";
-
-        if (props.Count > 0)
-            throw new Exception(message);
     }
 
     // Required fields list is taken from the CreateUserDTO class via reflection.
