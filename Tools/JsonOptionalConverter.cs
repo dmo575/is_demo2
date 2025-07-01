@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore.Update;
 // and whenever an Optional<T> needs to be serialized iknto JSON
 public class JsonOptionalConverter<T> : JsonConverter<Optional<T>>
 {
+    public override bool HandleNull => true;
+
     public override Optional<T>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
 
