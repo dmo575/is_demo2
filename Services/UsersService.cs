@@ -37,19 +37,20 @@ public class UserService
 
     public async Task<ResponseUserDTO> AddNewUser(CreateUserDTO newUserDTO)
     {
-        // If an Optional is NULL               SET TO NULL
-        // If an Optional's value is NULL       SET TO NULL
-        User createdUser = new User{
+        // if an Optional is NULL               SET TO NULL
+        // if an Optional's value is NULL       SET TO NULL
+        User createdUser = new User
+        {
             FirstName = newUserDTO.FirstName,
             LastName = newUserDTO.LastName,
             Email = newUserDTO.Email,
             PhoneNumber = newUserDTO.PhoneNumber != null ? newUserDTO.PhoneNumber.value : null,
             Dob = newUserDTO.Dob != null ? newUserDTO.Dob.value : null
-        }
+        };
 
         SanitizeUser(createdUser);
 
-        return GetResponseUserDTO(_userRepository.CreateUser(createdUser));
+        return GetResponseUserDTO(await _userRepository.AddUser(createdUser))!;
     }
 
     public async Task<ResponseUserDTO?> FullyUpdateUserById(UpdateUserDTO userDTO, int id)
@@ -58,8 +59,8 @@ public class UserService
 
         if (originalUser == null) return null;
 
-        // If an Optional is NULL               SET TO NULL
-        // If an Optional's value is NULL       SET TO NULL
+        // if an Optional is NULL               SET TO NULL
+        // if an Optional's value is NULL       SET TO NULL
         User fullyUpdatedUser = new User
         {
             FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : null!,
@@ -81,8 +82,8 @@ public class UserService
 
         if (targetUser == null) return null;
 
-        // If an Optional is NULL               SKIP IT
-        // If an Optional's value is NULL       SET TO NULL
+        // if an Optional is NULL               SKIP IT
+        // if an Optional's value is NULL       SET TO NULL
         User partiallyUPdatedUser = new User {
             FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : targetUser.FirstName,
             LastName = userDTO.LastName != null ? userDTO.LastName.value! : targetUser.LastName,
