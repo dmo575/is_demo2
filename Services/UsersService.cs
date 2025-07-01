@@ -26,7 +26,7 @@ public class UserService
 
         foreach (User u in users)
         {
-            responseUsers.Add(GetResponseUser(u)!);
+            responseUsers.Add(GetResponseUserDTO(u)!);
         }
 
         return responseUsers;
@@ -34,7 +34,7 @@ public class UserService
 
     public async Task<ResponseUserDTO?> GetUserById(int id)
     {
-        return GetResponseUser(await _userRepository.GetUserById(id));
+        return GetResponseUserDTO(await _userRepository.GetUserById(id));
     }
 
     public async Task<ResponseUserDTO> AddNewUser(CreateUserDTO newUserDTO)
@@ -51,14 +51,14 @@ public class UserService
         });
 
         // here we convert
-        return GetResponseUser(createdUser)!;
+        return GetResponseUserDTO(createdUser)!;
     }
 
     public async Task<ResponseUserDTO?> FullyUpdateUserById(UpdateUserDTO userDTO, int id)
     {
         // Makes sure the userDTO's REQUIRED properties are not set to null
         // Throws NullReqFieldException exception if so.
-        CheckRequiredPropsNotNull(userDTO);
+        CheckRequiredPropsNotNull(userDTO, true);
 
         User? originalUser = await _userRepository.GetUserById(id);
 
@@ -69,9 +69,9 @@ public class UserService
         // Optional's value for a NON NULL column will throw an Exception
         User updatedUser = new User
         {
-            FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : originalUser.FirstName,
-            LastName = userDTO.LastName != null ? userDTO.LastName.value! : originalUser.LastName,
-            Email = userDTO.Email != null ? userDTO.Email.value! : originalUser.Email,
+            FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : null!,
+            LastName = userDTO.LastName != null ? userDTO.LastName.value! : null!,
+            Email = userDTO.Email != null ? userDTO.Email.value! : null!,
             PhoneNumber = userDTO.PhoneNumber != null ? userDTO.PhoneNumber.value : null,
             Dob = userDTO.Dob != null ? userDTO.Dob.value : null
         };
@@ -80,14 +80,14 @@ public class UserService
         // throws SanitationException
         SanitizeUser(updatedUser);
 
-        return GetResponseUser(await _userRepository.UpdateUserById(updatedUser, id));
+        return GetResponseUserDTO(await _userRepository.UpdateUserById(updatedUser, id));
     }
 
     public async Task<ResponseUserDTO?> PartiallyUpdateUserById(UpdateUserDTO userDTO, int id)
     {
         // Makes sure the userDTO's REQUIRED properties are not set to null
         // Throws NullReqFieldException exception if so.
-        CheckRequiredPropsNotNull(userDTO);
+        CheckRequiredPropsNotNull(userDTO, false);
 
         User? targetUser = await _userRepository.GetUserById(id);
 
@@ -96,13 +96,13 @@ public class UserService
         // If an Optional is NULL               SKIP IT
         // If an Optional's value is NULL       SET TO NULL
         // Optional's value for a 'NOT NULL' column will throw an Exception
-        return GetResponseUser(await _userRepository.UpdateUserById(new User
+        return GetResponseUserDTO(await _userRepository.UpdateUserById(new User
         {
             FirstName = userDTO.FirstName != null ? userDTO.FirstName.value! : targetUser.FirstName,
             LastName = userDTO.LastName != null ? userDTO.LastName.value! : targetUser.LastName,
             Email = userDTO.Email != null ? userDTO.Email.value! : targetUser.Email,
-            PhoneNumber = userDTO.PhoneNumber == null ? targetUser.PhoneNumber : userDTO.PhoneNumber.value,
-            Dob = userDTO.Dob == null ? targetUser.Dob : userDTO.Dob.value
+            PhoneNumber = userDTO.PhoneNumber != null ? userDTO.PhoneNumber.value: targetUser.PhoneNumber,
+            Dob = userDTO.Dob != null ? userDTO.Dob.value : targetUser.Dob
         }, id));
     }
 
@@ -140,7 +140,7 @@ public class UserService
     }
 
     // Required fields list is taken from the CreateUserDTO class via reflection.
-    private void CheckRequiredPropsNotNull(UpdateUserDTO user)
+    private void CheckRequiredPropsNotNull(UpdateUserDTO user, bool checkOptionalNotNull)
     {
         string message = "You cannot set the following properties to NULL:";
         List<string> props = new List<string>();
@@ -159,15 +159,21 @@ public class UserService
             {
                 object? mem_user_curProp = cls_UpdateUserDTO_curProp.GetValue(user);
 
-                // we continue if the Optional in mem is null, because that means the request
-                // just doesn't want to update the field.
-                if (mem_user_curProp == null) continue;
+                // if the Optional in mem is NULL:
+                if (mem_user_curProp == null)
+                {
+                    // add it to the list of nulls if we are indeed checking for that too
+                    if (checkOptionalNotNull)
+                        props.Add(cls_UpdateUserDTO_curProp.Name);
+
+                    continue;
+                }
 
                 PropertyInfo? cls_UpdateUserDTO_curProp_ValueProp = mem_user_curProp.GetType().GetProperty("value");
 
                 var mem_user_curProp_ValueProp = cls_UpdateUserDTO_curProp_ValueProp?.GetValue(mem_user_curProp);
 
-                // check if the value of 'Value' is set to null
+                // check if the value of 'value' is set to null
                 if (mem_user_curProp_ValueProp == null)
                 {
                     // since its null, it means we are explicitly setting the value of a required column
@@ -188,7 +194,7 @@ public class UserService
         if (props.Count > 0) throw new NullReqFieldException(message);
     }
 
-    private ResponseUserDTO? GetResponseUser(User? modelUser)
+    private ResponseUserDTO? GetResponseUserDTO(User? modelUser)
     {
         if (modelUser == null)
             return null;
@@ -211,16 +217,14 @@ public class UserService
         List<string> errors = new List<string>();
         string errorMessage = "";
 
-
-
         if (u.PhoneNumber?.Length != 10)
-            errors.Add("Property PhoneNumber must be a 10 digits string");
+            errors.Add("Property PhoneNumber must be a 10 character string.");
         if (u.FirstName.Length > 25)
-            errors.Add("Property FirstName must not exceed 25 digits");
+            errors.Add("Property FirstName must not exceed 25 characters.");
         if (u.LastName.Length > 25)
-            errors.Add("Property LastName must not exceed 25 digits");
+            errors.Add("Property LastName must not exceed 25 characters.");
         if (u.Email.Length > 25)
-            errors.Add("Property Email must not exceed 30 digits");
+            errors.Add("Property Email must not exceed 30 characters.");
 
         if (errors.Count() == 0) return;
 
