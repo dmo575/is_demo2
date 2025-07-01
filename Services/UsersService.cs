@@ -217,7 +217,7 @@ public class UserService
         List<string> errors = new List<string>();
         string errorMessage = "";
 
-        if (u.PhoneNumber?.Length != 10)
+        if (u.PhoneNumber != null && u.PhoneNumber.Length != 10)
             errors.Add("Property PhoneNumber must be a 10 character string.");
         if (u.FirstName.Length > 25)
             errors.Add("Property FirstName must not exceed 25 characters.");
