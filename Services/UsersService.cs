@@ -177,6 +177,8 @@ public class UserService
         }
 
         if (erList.Count > 0)
-            throw new Exception(JsonSerializer.Serialize(erList));
+            // throw new SanitationException(JsonSerializer.Serialize(erList));
+            throw new SanitationException(erList);
+
     }
 }

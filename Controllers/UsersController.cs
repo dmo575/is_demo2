@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using demo2;
 using Microsoft.Identity.Client;
 using Microsoft.Data.SqlClient;
+using System.Net.Mime;
 
 
 [ApiController]
@@ -59,9 +60,9 @@ public class UsersController : ControllerBase
 
             return Ok(updatedUser);
         }
-        catch (NullReqFieldException ex)
+        catch (SanitationException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(ex.errorList);
         }
     }
 
@@ -77,9 +78,9 @@ public class UsersController : ControllerBase
 
             return Ok(updatedUser);
         }
-        catch (NullReqFieldException ex)
+        catch (SanitationException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(ex.errorList);
         }
     }
 
