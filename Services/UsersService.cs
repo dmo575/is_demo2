@@ -52,7 +52,7 @@ public class UserService
             Dob = newUserDTO.Dob != null ? newUserDTO.Dob.value : null
         };
 
-        SanitizeUser_NEW(createdUser);
+        SanitizeUser(createdUser);
 
         return GetResponseUserDTO(await _userRepository.AddUser(createdUser))!;
     }
@@ -75,7 +75,7 @@ public class UserService
         };
 
         // checks for invalid values assigned to the user's properties
-        SanitizeUser_NEW(fullyUpdatedUser);
+        SanitizeUser(fullyUpdatedUser);
 
         return GetResponseUserDTO(await _userRepository.UpdateUserById(fullyUpdatedUser, id));
     }
@@ -97,7 +97,7 @@ public class UserService
         };
 
         // checks for invalid values assigned to the user's properties
-        SanitizeUser_NEW(partiallyUPdatedUser);
+        SanitizeUser(partiallyUPdatedUser);
 
         return GetResponseUserDTO(await _userRepository.UpdateUserById(partiallyUPdatedUser, id));
     }
@@ -105,97 +105,6 @@ public class UserService
     public async Task<bool> DeleteUserById(int id)
     {
         return await _userRepository.DeleteUserById(id);
-    }
-
-    private void CheckRequiredPropsNotNull_NEW(User user)
-    {
-        string message = "You cannot set the following properties to NULL:";
-        List<string> props = new List<string>();
-
-        List<string> requiredPropsNames = typeof(CreateUserDTO)
-        .GetProperties()
-        .Where(p => Attribute.IsDefined(p, typeof(RequiredAttribute)))
-        .Select(p => p.Name)
-        .ToList();
-
-        PropertyInfo[] col_cls_UpdateUserDTO_properties = typeof(User).GetProperties();
-
-        foreach (PropertyInfo cls_UpdateUserDTO_curProp in col_cls_UpdateUserDTO_properties)
-        {
-            if (requiredPropsNames.Contains(cls_UpdateUserDTO_curProp.Name))
-            {
-                object? mem_user_curProp = cls_UpdateUserDTO_curProp.GetValue(user);
-
-                // if the field in mem is null
-                if (mem_user_curProp == null)
-                    props.Add(cls_UpdateUserDTO_curProp.Name);
-            }
-        }
-
-        if (props.Count == 0) return;
-
-        for (int i = 0; i < props.Count - 1; i++)
-        {
-            message += $" {props[i]},";
-        }
-        message += $" {props.Last()}.";
-
-        if (props.Count > 0) throw new NullReqFieldException(message);
-    }
-
-    // Required fields list is taken from the CreateUserDTO class via reflection.
-    private void CheckRequiredPropsNotNull(UpdateUserDTO user, bool checkOptionalNotNull)
-    {
-        string message = "You cannot set the following properties to NULL:";
-        List<string> props = new List<string>();
-
-        List<string> requiredPropsNames = typeof(CreateUserDTO)
-        .GetProperties()
-        .Where(p => Attribute.IsDefined(p, typeof(RequiredAttribute)))
-        .Select(p => p.Name)
-        .ToList();
-
-        PropertyInfo[] col_cls_UpdateUserDTO_properties = typeof(UpdateUserDTO).GetProperties();
-
-        foreach (PropertyInfo cls_UpdateUserDTO_curProp in col_cls_UpdateUserDTO_properties)
-        {
-            if (requiredPropsNames.Contains(cls_UpdateUserDTO_curProp.Name))
-            {
-                object? mem_user_curProp = cls_UpdateUserDTO_curProp.GetValue(user);
-
-                // if the Optional in mem is NULL:
-                if (mem_user_curProp == null)
-                {
-                    // add it to the list of nulls if we are indeed checking for that too
-                    if (checkOptionalNotNull)
-                        props.Add(cls_UpdateUserDTO_curProp.Name);
-
-                    continue;
-                }
-
-                PropertyInfo? cls_UpdateUserDTO_curProp_ValueProp = mem_user_curProp.GetType().GetProperty("value");
-
-                var mem_user_curProp_ValueProp = cls_UpdateUserDTO_curProp_ValueProp?.GetValue(mem_user_curProp);
-
-                // check if the value of 'value' is set to null
-                if (mem_user_curProp_ValueProp == null)
-                {
-                    // since its null, it means we are explicitly setting the value of a required column
-                    // to null, which is not allowed, so we add the name of this property to the list
-                    props.Add(cls_UpdateUserDTO_curProp.Name);
-                }
-            }
-        }
-
-        if (props.Count == 0) return;
-
-        for (int i = 0; i < props.Count - 1; i++)
-        {
-            message += $" {props[i]},";
-        }
-        message += $" {props.Last()}.";
-
-        if (props.Count > 0) throw new NullReqFieldException(message);
     }
 
     private ResponseUserDTO? GetResponseUserDTO(User? modelUser)
@@ -214,7 +123,8 @@ public class UserService
         };
     }
 
-    private void SanitizeUser_NEW(User u)
+    // server-side sanitation. Takes some workload off the database server.
+    private void SanitizeUser(User u)
     {
         List<TokenError> erList = new List<TokenError>();
 
@@ -265,54 +175,8 @@ public class UserService
                 }
             }
         }
-        
+
         if (erList.Count > 0)
             throw new Exception(JsonSerializer.Serialize(erList));
-    }
-
-    // server-side sanitation for the User. Ideally we would read from the User type to get
-    // the constraints and check on those here.
-    private void SanitizeUser(User u)
-    {
-        // makes sure that any required values are not set to null. Throws "NullReqFieldException" if so.
-        CheckRequiredPropsNotNull_NEW(u);
-
-        // TODO: For each prop, like we are doing with the reflection method, check for all of the constraints, not just the
-        // required constraint.
-        // Use the User model class via the Context.
-        // Create some sort of JSON to display all the errors per field, like:
-        /*
-        [
-            {
-                "Token": "FirstName",
-                "Errors": [
-                    "Required field cannot be set to null",
-                    "Must be no longer than 20 characters long"
-                ]
-            },
-            {...}
-        ]
-        */
-
-        List<string> errors = new List<string>();
-        string errorMessage = "";
-
-        if (u.PhoneNumber != null && u.PhoneNumber.Length != 10)
-            errors.Add("Property PhoneNumber must be a 10 character string.");
-        if (u.FirstName.Length > 25)
-            errors.Add("Property FirstName must not exceed 25 characters.");
-        if (u.LastName.Length > 25)
-            errors.Add("Property LastName must not exceed 25 characters.");
-        if (u.Email.Length > 25)
-            errors.Add("Property Email must not exceed 30 characters.");
-
-        if (errors.Count() == 0) return;
-
-        foreach (String error in errors)
-        {
-            errorMessage += error + "\n";
-        }
-
-        throw new Exception(errorMessage);
     }
 }
