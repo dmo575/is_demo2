@@ -1,19 +1,23 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading.Tasks;
 using demo2;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 public class UserService
 {
     private readonly UsersRepository _userRepository;
     private readonly ILogger<UserService> _logger;
+    private readonly IEntityType _userEntity;
 
 
     public UserService(UsersRepository userRepository, ILogger<UserService> logger, DbnameContext context)
     {
         _userRepository = userRepository;
         _logger = logger;
+        _userEntity = context.Model.GetEntityTypes().FirstOrDefault(ent => ent.ClrType == typeof(User))!;
     }
 
     public async Task<List<ResponseUserDTO>> GetAllUsers()
@@ -48,7 +52,7 @@ public class UserService
             Dob = newUserDTO.Dob != null ? newUserDTO.Dob.value : null
         };
 
-        SanitizeUser(createdUser);
+        SanitizeUser_NEW(createdUser);
 
         return GetResponseUserDTO(await _userRepository.AddUser(createdUser))!;
     }
@@ -71,7 +75,7 @@ public class UserService
         };
 
         // checks for invalid values assigned to the user's properties
-        SanitizeUser(fullyUpdatedUser);
+        SanitizeUser_NEW(fullyUpdatedUser);
 
         return GetResponseUserDTO(await _userRepository.UpdateUserById(fullyUpdatedUser, id));
     }
@@ -93,7 +97,7 @@ public class UserService
         };
 
         // checks for invalid values assigned to the user's properties
-        SanitizeUser(partiallyUPdatedUser);
+        SanitizeUser_NEW(partiallyUPdatedUser);
 
         return GetResponseUserDTO(await _userRepository.UpdateUserById(partiallyUPdatedUser, id));
     }
@@ -208,6 +212,62 @@ public class UserService
             PhoneNumber = modelUser.PhoneNumber,
             Dob = modelUser.Dob
         };
+    }
+
+    private void SanitizeUser_NEW(User u)
+    {
+        List<TokenError> erList = new List<TokenError>();
+
+        foreach (var modelProp in _userEntity.GetProperties())
+        {
+            foreach (var userProp in u.GetType().GetProperties())
+            {
+                if (userProp.Name == modelProp.Name)
+                {
+                    var mem_user_prop = userProp.GetValue(u);
+                    List<string> erMessages = new List<string>();
+
+                    if (mem_user_prop == null)
+                    {
+                        // if set to null, and is nullable, continue
+                        // else if set to null while not being nullable, add error
+                        if (modelProp.IsNullable)
+                            continue;
+                        else
+                            erMessages.Add("Cannot be null");
+                    }
+                    else
+                    {
+                        // here we write down check on string fields
+                        if (modelProp.ClrType == typeof(string))
+                        {
+                            // if max length exceeded, add that error to the list
+                            if (modelProp.GetMaxLength() < ((string)mem_user_prop).Length)
+                                erMessages.Add($"Max length is {modelProp.GetMaxLength()}");
+
+                            // ... other string related checks
+                        }
+
+                        // ... other filed types we might want to check
+                    }
+
+                    if (erMessages.Count == 0) continue;
+
+                    // fill the TokenError object with all of the errors for the current property
+                    TokenError erToken = new() { TokenName = userProp.Name };
+                    foreach (var errorMessage in erMessages)
+                    {
+                        erToken.Errors.Add(errorMessage);
+                    }
+
+                    // add the token to the list
+                    erList.Add(erToken);
+                }
+            }
+        }
+        
+        if (erList.Count > 0)
+            throw new Exception(JsonSerializer.Serialize(erList));
     }
 
     // server-side sanitation for the User. Ideally we would read from the User type to get

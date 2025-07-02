@@ -1,5 +1,5 @@
 public class TokenError
 {
-    public string mtokenName { get; set; }
-    public List<string> errors { get; set; }
+    public string TokenName { get; set; } = "";
+    public List<string> Errors { get; set; } = new List<string>();
 }
