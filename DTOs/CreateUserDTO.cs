@@ -8,8 +8,6 @@ public class CreateUserDTO
     public string LastName { get; set; } = null!;
     [Required]
     public string Email { get; set; } = null!;
-
-    public Optional<string>? PhoneNumber { get; set; }
-
-    public Optional<DateOnly>? Dob { get; set; }
+    public Optional<string?>? PhoneNumber { get; set; }
+    public Optional<DateOnly?>? Dob { get; set; }
 }
